@@ -19,20 +19,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Both macOS builds run on ONE Mac machine (Apple Silicon cross-compiles the Intel build):
+        # macOS runners are scarce and a second one can wait in the queue for hours.
         include:
-          - { os: windows-latest, target: x86_64-pc-windows-msvc,    out: ai-relay-windows-x64.exe, bin: ai-relay.exe }
-          - { os: macos-latest,   target: aarch64-apple-darwin,      out: ai-relay-macos-arm64,     bin: ai-relay }
-          - { os: macos-latest,   target: x86_64-apple-darwin,       out: ai-relay-macos-x64,       bin: ai-relay }
-          - { os: ubuntu-latest,  target: x86_64-unknown-linux-musl, out: ai-relay-linux-x64,       bin: ai-relay }
+          - { os: windows-latest, targets: x86_64-pc-windows-msvc,                    outs: ai-relay-windows-x64.exe,                  bin: ai-relay.exe }
+          - { os: macos-latest,   targets: aarch64-apple-darwin x86_64-apple-darwin, outs: ai-relay-macos-arm64 ai-relay-macos-x64, bin: ai-relay }
+          - { os: ubuntu-latest,  targets: x86_64-unknown-linux-musl,                 outs: ai-relay-linux-x64,                        bin: ai-relay }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Rust toolchain
+        shell: bash
         run: |
           rustup toolchain install stable --profile minimal
-          rustup target add ${{ matrix.target }}
+          rustup target add ${{ matrix.targets }}
       - name: musl tools
-        if: contains(matrix.target, 'musl')
+        if: contains(matrix.targets, 'musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       # The UI font is not in this repo; it is added to release builds from repository secrets
       # (FONT_REGULAR / FONT_BOLD / FONT_EXTRABOLD = base64 of the .woff2 files). Without them the
@@ -53,25 +56,29 @@ jobs:
           else
             echo "font secrets not set: building with the system font"
           fi
-      - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
-      - name: Collect
+      - name: Build and collect
         shell: bash
         run: |
           mkdir dist
-          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "dist/${{ matrix.out }}"
+          targets=(${{ matrix.targets }}); outs=(${{ matrix.outs }})
+          for i in "${!targets[@]}"; do
+            cargo build --release --locked --target "${targets[$i]}"
+            cp "target/${targets[$i]}/release/${{ matrix.bin }}" "dist/${outs[$i]}"
+          done
+          ls -la dist
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/${{ matrix.out }}
+          subject-path: dist/*
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.out }}
-          path: dist/${{ matrix.out }}
+          name: build-${{ matrix.os }}
+          path: dist/*
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v4
