@@ -9,7 +9,6 @@ license = "MIT"
 tiny_http = "0.12"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 serde_json = "1"
-webbrowser = "1"
 getrandom = "0.2"
 
 [profile.release]

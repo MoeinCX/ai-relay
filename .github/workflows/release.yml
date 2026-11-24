@@ -19,12 +19,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Both macOS builds run on ONE Mac machine (Apple Silicon cross-compiles the Intel build):
-        # macOS runners are scarce and a second one can wait in the queue for hours.
+        # macOS is cross-built on Linux with cargo-zigbuild: GitHub's macOS runners are often
+        # unavailable for long stretches, and the tool needs no macOS frameworks.
         include:
-          - { os: windows-latest, targets: x86_64-pc-windows-msvc,                    outs: ai-relay-windows-x64.exe,                  bin: ai-relay.exe }
-          - { os: macos-latest,   targets: aarch64-apple-darwin x86_64-apple-darwin, outs: ai-relay-macos-arm64 ai-relay-macos-x64, bin: ai-relay }
-          - { os: ubuntu-latest,  targets: x86_64-unknown-linux-musl,                 outs: ai-relay-linux-x64,                        bin: ai-relay }
+          - { os: windows-latest, targets: x86_64-pc-windows-msvc,                    outs: ai-relay-windows-x64.exe,                  bin: ai-relay.exe, zig: false }
+          - { os: ubuntu-latest,  targets: aarch64-apple-darwin x86_64-apple-darwin, outs: ai-relay-macos-arm64 ai-relay-macos-x64, bin: ai-relay,     zig: true }
+          - { os: ubuntu-latest,  targets: x86_64-unknown-linux-musl,                 outs: ai-relay-linux-x64,                        bin: ai-relay,     zig: false }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -37,6 +37,9 @@ jobs:
       - name: musl tools
         if: contains(matrix.targets, 'musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: zig cross-compiler
+        if: matrix.zig
+        run: pip install ziglang cargo-zigbuild
       # The UI font is not in this repo; it is added to release builds from repository secrets
       # (FONT_REGULAR / FONT_BOLD / FONT_EXTRABOLD = base64 of the .woff2 files). Without them the
       # build still succeeds and the UI uses the system font.
@@ -62,7 +65,11 @@ jobs:
           mkdir dist
           targets=(${{ matrix.targets }}); outs=(${{ matrix.outs }})
           for i in "${!targets[@]}"; do
-            cargo build --release --locked --target "${targets[$i]}"
+            if [ "${{ matrix.zig }}" = "true" ]; then
+              cargo zigbuild --release --locked --target "${targets[$i]}"
+            else
+              cargo build --release --locked --target "${targets[$i]}"
+            fi
             cp "target/${targets[$i]}/release/${{ matrix.bin }}" "dist/${outs[$i]}"
           done
           ls -la dist
@@ -79,7 +86,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: startsWith(github.ref, 'refs/tags/')
+    # Publish whatever built, even if one platform failed (its file is simply missing).
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/download-artifact@v4
         with:

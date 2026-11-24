@@ -41,7 +41,7 @@ fn main() {
     println!("If it does not open, copy the address above into your browser.");
     println!("Keep this window open while you work; close it (or press Ctrl+C) when done.");
     if std::env::var_os("AI_RELAY_NO_BROWSER").is_none() {
-        let _ = webbrowser::open(&url);
+        open_browser(&url);
     }
 
     let agent = ureq::AgentBuilder::new()
@@ -407,6 +407,20 @@ fn push_part(out: &mut Vec<u8>, boundary: &str, name: &str, file: &str, ctype: &
     );
     out.extend_from_slice(data);
     out.extend_from_slice(b"\r\n");
+}
+
+/// Opens the default browser with the system's own command (no extra libraries, so every
+/// platform can be cross-built from Linux).
+fn open_browser(url: &str) {
+    use std::process::Command;
+    #[cfg(target_os = "windows")]
+    // `start` treats the first quoted argument as a window title, hence the empty "".
+    let r = Command::new("cmd").args(["/C", "start", "", url]).spawn();
+    #[cfg(target_os = "macos")]
+    let r = Command::new("open").arg(url).spawn();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let r = Command::new("xdg-open").arg(url).spawn();
+    let _ = r;
 }
 
 fn random_hex(bytes: usize) -> String {
