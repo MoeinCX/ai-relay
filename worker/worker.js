@@ -8,7 +8,8 @@
 // SECRET is a Worker secret variable (Settings → Variables and Secrets → type Secret), min 16 chars.
 // Without the right secret every request gets a plain 404, so the host looks like an empty site.
 // Only the AI hosts below are reachable: this is not an open proxy.
-// RELAY_VERSION 2  (v2: address list page at https://HOST/SECRET/)
+// RELAY_VERSION 1
+// Open https://HOST/SECRET/ in a browser to see every service's address (bookmarkable).
 
 const TARGETS = {
   gemini: 'generativelanguage.googleapis.com',
@@ -76,7 +77,7 @@ export default {
     const service = parts[2];
     // Health check: https://HOST/SECRET/ping  or  https://HOST/SECRET/<service>/ping  (readable from a web page)
     if (service === 'ping' || (TARGETS[service] && parts[3] === 'ping' && parts.length === 4)) {
-      return new Response(JSON.stringify({ ok: true, relay: 2, colo: request.cf?.colo || '' }), {
+      return new Response(JSON.stringify({ ok: true, relay: 1, colo: request.cf?.colo || '' }), {
         headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' },
       });
     }
