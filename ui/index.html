@@ -126,7 +126,11 @@
       <p>✅ <b>فقط مالِ شماست</b>؛ هیچ‌کس دیگر نمی‌تواند از آن استفاده کند.</p>
       <p>✅ امن است: اطلاعاتتان فقط بینِ همین کامپیوتر و کلادفلر جابه‌جا می‌شود.</p>
     </div>
-    <div class="tip warn">برای همین چند دقیقه‌ی ساختن، اگر سایتِ کلادفلر باز نشد، فیلترشکن را روشن کنید. بعد از ساختن، دیگر هیچ‌وقت فیلترشکن لازم نیست.</div>
+    <div class="card">
+      <p><b>اول یک آزمایشِ کوچک:</b> آیا رله روی اینترنتِ شما کار می‌کند؟ <b>فیلترشکن را خاموش کنید</b> و دکمه را بزنید.</p>
+      <div class="row"><button class="btn pri" id="btnNetCheck">آزمایشِ اینترنتِ من</button></div>
+      <div id="netResult"></div>
+    </div>
     <div class="nav"><span></span><button class="btn pri big" data-next>شروع کنیم ←</button></div>
     <details id="haveAddr"><summary>قبلاً رله ساخته‌ام و یک آدرس از آن دارم</summary>
       <p>یکی از آدرس‌هایی را که قبلاً گرفته‌اید (مثلاً آدرسِ Gemini که در برنامه گذاشته‌اید) اینجا بچسبانید؛ آدرسِ همه‌ی سرویس‌ها را از رویش می‌سازیم.</p>
@@ -498,6 +502,26 @@
     if (!j.ok) return status($('#stOld'), 'err', 'ذخیره نشد: ' + errMsg(j));
     await refreshSaved();
     if (!alive) $('#savedList').insertAdjacentHTML('afterbegin', '<div class="tip warn">رله الان جواب نداد (شاید فیلترشکن روشن است، یا رله حذف شده). آدرس‌ها نشان داده شدند، ولی اگر در برنامه کار نکردند، یک رله‌ی تازه بسازید.</div>');
+  };
+
+  // ─── آزمایشِ اینترنتِ کاربر پیش از ساختن ───
+  // relay-check: ورکرِ عمومیِ کوچک روی workers.dev (worker/check-worker.js)؛ کلادفلر را خودِ برنامه می‌سنجد.
+  const CHECK_URL = 'https://relay-check.moeincx.workers.dev/';
+  $('#btnNetCheck').onclick = async () => {
+    const b = $('#btnNetCheck'), out = $('#netResult');
+    b.disabled = true;
+    out.innerHTML = '<div class="status busy"><span class="spin"></span>در حالِ آزمایش… (تا ۱۰ ثانیه)</div>';
+    const relayP = fetch(CHECK_URL, { cache: 'no-store', signal: AbortSignal.timeout(9000) }).then((r) => r.json()).then((j) => (j.ok ? j : false)).catch(() => false);
+    const cfP = api('netcheck').then((j) => !!j.cloudflare).catch(() => false);
+    const [relay, cf] = await Promise.all([relayP, cfP]);
+    b.disabled = false;
+    const line = (ok, t) => `<p>${ok ? '✅' : '❌'} ${t}</p>`;
+    let html = line(relay, 'دامنه‌ی رله (<span class="en">workers.dev</span>)') + line(cf, 'کلادفلر (فقط برای ساختن)');
+    if (relay && relay.country && relay.country !== 'IR') html += '<div class="tip warn"><b>به نظر فیلترشکن روشن است</b> (اتصال از بیرونِ ایران آمد)، پس این نتیجه معتبر نیست. فیلترشکن را کامل خاموش کنید و دوباره دکمه را بزنید.</div>';
+    else if (relay && cf) html += '<div class="tip good"><b>عالی!</b> رله روی اینترنتِ شما کار می‌کند. «شروع کنیم» را بزنید.</div>';
+    else if (relay) html += '<div class="tip warn"><b>رله کار می‌کند</b>، ولی کلادفلر باز نشد. فقط برای همین چند دقیقه‌ی ساختن فیلترشکن را روشن کنید؛ بعد خاموشش کنید و رله بدونِ آن کار می‌کند.</div>';
+    else html += '<div class="tip bad"><b>دامنه‌ی رله روی این اینترنت باز نمی‌شود</b>، پس رله اینجا بدونِ فیلترشکن کار نمی‌کند. ۱) مطمئن شوید فیلترشکن خاموش است و دوباره بزنید. ۲) با اینترنتِ دیگری (موبایل/ثابت) امتحان کنید. ۳) اگر دامنه‌ی شخصی دارید، راهنمای سایت را ببینید.</div>';
+    out.innerHTML = html;
   };
 
   refreshSaved().then((has) => { if (!has) show(0); });

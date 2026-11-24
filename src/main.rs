@@ -136,6 +136,11 @@ fn handle(mut req: Request, agent: &ureq::Agent, port: u16, nonce: &str) -> bool
         }),
         "/api/saved" => Ok(json!({ "ok": true, "relays": load_saved(), "file": saved_path().map(|p| p.display().to_string()) })),
         "/api/save" => save_manual(&body),
+        // Is api.cloudflare.com reachable from this computer? (any HTTP answer counts)
+        "/api/netcheck" => {
+            let (s, _) = cf(agent, "GET", "/user/tokens/verify", "netcheck-without-token", None);
+            Ok(json!({ "ok": true, "cloudflare": s != 0 }))
+        }
         "/api/forget" => {
             let url = body["url"].clone();
             forget_by(|r| r["url"] == url);
