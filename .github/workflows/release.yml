@@ -1,0 +1,86 @@
+# Builds the tool from this exact source on GitHub's own machines, then publishes:
+#   - the binaries, a SHA256SUMS.txt file, and
+#   - a signed build-provenance attestation (proves each file was built here, from this commit).
+# Check a download with:  gh attestation verify <file> --repo <owner>/<repo>
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write       # create the GitHub release
+  id-token: write       # sign the attestation (Sigstore)
+  attestations: write   # store the attestation
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: x86_64-pc-windows-msvc,    out: ai-relay-windows-x64.exe, bin: ai-relay.exe }
+          - { os: macos-latest,   target: aarch64-apple-darwin,      out: ai-relay-macos-arm64,     bin: ai-relay }
+          - { os: macos-latest,   target: x86_64-apple-darwin,       out: ai-relay-macos-x64,       bin: ai-relay }
+          - { os: ubuntu-latest,  target: x86_64-unknown-linux-musl, out: ai-relay-linux-x64,       bin: ai-relay }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add ${{ matrix.target }}
+      - name: musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # The UI font is not in this repo; it is added to release builds from repository secrets
+      # (FONT_REGULAR / FONT_BOLD / FONT_EXTRABOLD = base64 of the .woff2 files). Without them the
+      # build still succeeds and the UI uses the system font.
+      - name: UI font
+        shell: bash
+        env:
+          FONT_REGULAR: ${{ secrets.FONT_REGULAR }}
+          FONT_BOLD: ${{ secrets.FONT_BOLD }}
+          FONT_EXTRABOLD: ${{ secrets.FONT_EXTRABOLD }}
+        run: |
+          if [ -n "$FONT_REGULAR" ] && [ -n "$FONT_BOLD" ] && [ -n "$FONT_EXTRABOLD" ]; then
+            mkdir -p fonts
+            printf '%s' "$FONT_REGULAR"   | base64 -d > fonts/Satrap-Regular.woff2
+            printf '%s' "$FONT_BOLD"      | base64 -d > fonts/Satrap-Bold.woff2
+            printf '%s' "$FONT_EXTRABOLD" | base64 -d > fonts/Satrap-ExtraBold.woff2
+            echo "font added"
+          else
+            echo "font secrets not set: building with the system font"
+          fi
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "dist/${{ matrix.out }}"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/${{ matrix.out }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: dist/${{ matrix.out }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

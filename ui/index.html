@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ساختِ رله‌ی هوش مصنوعی</title>
+<style>
+  @font-face{ font-family:'Satrap'; font-weight:400; font-display:swap; src:url('/fonts/Satrap-Regular.woff2') format('woff2'); }
+  @font-face{ font-family:'Satrap'; font-weight:700; font-display:swap; src:url('/fonts/Satrap-Bold.woff2') format('woff2'); }
+  @font-face{ font-family:'Satrap'; font-weight:800 900; font-display:swap; src:url('/fonts/Satrap-ExtraBold.woff2') format('woff2'); }
+  :root{ --bg:#0b0907; --panel:#17120d; --panel2:#1e1812; --line:rgba(217,179,92,.16); --line-s:rgba(217,179,92,.38);
+    --gold-l:#f7dfa0; --gold:#d9b35c; --gold-d:#9c772d; --text:#f4ecd9; --dim:#c2b291; --faint:#8a7b62;
+    --ok:#5cbf8a; --err:#e8707f; --wrn:#e0a852; --cyan:#5cc8d9; --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+    --cf:#f6821f; --cfbg:#ffffff; --cftext:#1d1d1d; --cfline:#d9d9d9; --cfblue:#0051c3; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--text); font-family:'Satrap','Segoe UI',Tahoma,sans-serif; line-height:2; font-size:16px; padding:22px 16px 70px; }
+  .wrap{ max-width:760px; margin:0 auto; }
+  a{ color:var(--gold-l); } b{ color:var(--gold-l); }
+  .en{ font-family:var(--mono); direction:ltr; unicode-bidi:isolate; font-size:.9em; background:rgba(217,179,92,.1); border:1px solid var(--line); border-radius:6px; padding:0 6px; color:var(--gold-l); white-space:nowrap; }
+
+  /* نوارِ پیشرفت */
+  .top{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }
+  .top h1{ font-size:20px; color:var(--gold-l); }
+  .prog{ display:flex; gap:6px; margin:6px 0 22px; }
+  .prog i{ flex:1; height:6px; border-radius:99px; background:var(--panel2); }
+  .prog i.on{ background:linear-gradient(90deg,var(--gold-d),var(--gold-l)); }
+  .stepno{ color:var(--faint); font-size:14px; }
+
+  .scr[hidden]{ display:none; }
+  h2{ font-size:26px; line-height:1.6; color:var(--text); margin-bottom:8px; }
+  .lead{ color:var(--dim); font-size:17px; margin-bottom:16px; }
+  p{ margin:8px 0; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px; margin:14px 0; }
+  .tip{ border-inline-start:4px solid var(--cyan); background:rgba(92,200,217,.07); border-radius:10px; padding:12px 16px; margin:14px 0; font-size:15px; }
+  .tip.warn{ border-color:var(--wrn); background:rgba(224,168,82,.08); }
+  .tip.bad{ border-color:var(--err); background:rgba(232,112,127,.08); }
+  .tip.good{ border-color:var(--ok); background:rgba(92,191,138,.08); }
+
+  .todo{ list-style:none; counter-reset:t; margin:10px 0; }
+  .todo li{ counter-increment:t; position:relative; padding:10px 48px 10px 0; border-bottom:1px dashed var(--line); }
+  .todo li:last-child{ border-bottom:0; }
+  .todo li::before{ content:counter(t); position:absolute; right:0; top:10px; width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-weight:800; background:rgba(217,179,92,.14); border:1px solid var(--line-s); color:var(--gold-l); }
+
+  .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font:inherit; font-weight:800; font-size:16px; padding:12px 26px; border-radius:14px; cursor:pointer; border:1px solid var(--line-s); background:transparent; color:var(--text); text-decoration:none; }
+  .btn:hover{ border-color:var(--gold); background:var(--line); }
+  .btn.pri{ background:linear-gradient(135deg,var(--gold-l),var(--gold) 60%,var(--gold-d)); color:#211608; border-color:transparent; }
+  .btn.big{ font-size:19px; padding:16px 34px; border-radius:16px; }
+  .btn.sm{ padding:5px 14px; font-size:14px; border-radius:10px; font-weight:700; }
+  .btn.link{ border:0; background:none; color:var(--dim); text-decoration:underline; font-weight:500; padding:6px 4px; }
+  .btn.danger{ border-color:rgba(232,112,127,.5); color:var(--err); }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  .nav{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:26px; flex-wrap:wrap; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+  .center{ text-align:center; }
+
+  input,select{ font:inherit; font-family:var(--mono); direction:ltr; text-align:left; font-size:15px; width:100%; min-width:0; flex:1; padding:13px 14px; border-radius:12px; border:2px solid var(--line-s); background:#0e0b08; color:var(--text); }
+  input:focus{ outline:none; border-color:var(--gold); }
+  label{ display:block; color:var(--dim); margin:12px 0 4px; font-size:15px; }
+  .status{ margin-top:12px; font-size:16px; min-height:1.6em; font-weight:700; }
+  .status.ok{ color:var(--ok); } .status.err{ color:var(--err); } .status.busy{ color:var(--gold); }
+  .spin{ display:inline-block; width:16px; height:16px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:sp .8s linear infinite; vertical-align:-2px; margin-inline-end:6px; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+
+  /* تصویرِ شبیه‌سازی‌شده‌ی صفحه‌ی کلادفلر */
+  .mock{ background:var(--cfbg); color:var(--cftext); border-radius:12px; overflow:hidden; direction:ltr; text-align:left; font-family:'Segoe UI',Arial,sans-serif; font-size:13px; line-height:1.5; margin:12px 0; box-shadow:0 10px 30px -12px rgba(0,0,0,.7); }
+  .mock .bar{ background:#f2f2f2; border-bottom:1px solid var(--cfline); padding:7px 12px; display:flex; gap:6px; align-items:center; }
+  .mock .bar i{ width:9px; height:9px; border-radius:50%; background:#d0d0d0; display:inline-block; }
+  .mock .bar span{ margin-left:8px; color:#777; font-size:12px; }
+  .mock .body{ padding:14px 16px; }
+  .mock h4{ font-size:15px; margin-bottom:8px; }
+  .mock .lbl{ color:#555; font-size:12px; margin:8px 0 3px; font-weight:600; }
+  .mock .fld{ border:1px solid var(--cfline); border-radius:6px; padding:5px 9px; background:#fafafa; display:inline-block; min-width:110px; margin-right:6px; }
+  .mock .cfbtn{ display:inline-block; background:var(--cfblue); color:#fff; border-radius:6px; padding:6px 14px; font-weight:600; margin-top:10px; }
+  .mock .cfbtn.gray{ background:#e8e8e8; color:#333; }
+  .mock .hl{ outline:3px solid var(--cf); outline-offset:2px; border-radius:6px; position:relative; }
+  .mock .tag{ display:inline-block; background:var(--cf); color:#fff; border-radius:99px; padding:0 8px; font-size:11px; font-weight:700; margin-left:6px; vertical-align:middle; }
+  .mock .tokenbox{ font-family:var(--mono); background:#f6f6f6; border:1px solid var(--cfline); border-radius:6px; padding:7px 10px; color:#333; }
+  .cap{ text-align:center; color:var(--faint); font-size:13px; margin-top:-4px; }
+
+  /* نتیجه */
+  .addr{ font-family:var(--mono); direction:ltr; text-align:left; font-size:14px; word-break:break-all; background:#0e0b08; border:2px solid var(--line-s); border-radius:12px; padding:12px 14px; color:var(--gold-l); }
+  .kv{ display:grid; grid-template-columns:auto 1fr; gap:6px 14px; align-items:center; margin:10px 0; }
+  .kv > span:nth-child(odd){ color:var(--dim); }
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  td{ border-bottom:1px solid var(--line); padding:8px 4px; vertical-align:middle; }
+  td.a{ font-family:var(--mono); direction:ltr; text-align:left; font-size:12px; word-break:break-all; color:var(--gold-l); }
+  details{ margin:12px 0; border:1px solid var(--line); border-radius:12px; padding:10px 14px; background:var(--panel); }
+  summary{ cursor:pointer; color:var(--dim); font-weight:700; }
+  .closed{ text-align:center; padding:90px 0; color:var(--dim); font-size:18px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="top">
+    <h1>ساختِ رله‌ی هوش مصنوعی</h1>
+    <button class="btn sm" id="btnQuit">بستن</button>
+  </div>
+  <div class="stepno" id="stepno"></div>
+  <div class="prog" id="prog"></div>
+
+  <!-- ═══ رله‌های ذخیره‌شده (بازگشتِ کاربر) ═══ -->
+  <section id="saved" hidden>
+    <h2>رله‌ی شما آماده است 👋</h2>
+    <p class="lead">لازم نیست دوباره چیزی بسازید. آدرسِ هر سرویسی را که لازم دارید کپی کنید و در برنامه در یک «اتصالِ سفارشی» بگذارید.</p>
+    <div id="savedList"></div>
+    <details><summary>چطور در برنامه بگذارم؟</summary>
+      <ol class="todo">
+        <li>در ساتراپیون: <b>تنظیمات</b> ← <b>هوش مصنوعی</b> ← <b>اتصالِ جدید</b> ← <b>سفارشی</b>.</li>
+        <li><b>قالب</b> را همان که کنارِ سرویس نوشته انتخاب کنید و <b>آدرسِ پایه</b> را بچسبانید.</li>
+        <li><b>کلیدِ API</b> همان سرویس را بزنید، مدل را انتخاب کنید و ذخیره کنید.</li>
+      </ol>
+    </details>
+    <div class="row">
+      <button class="btn" id="btnNewRelay">ساختنِ یک رله‌ی تازه</button>
+    </div>
+    <p class="faint" id="savedFile"></p>
+  </section>
+
+  <!-- ═══ ۰. شروع ═══ -->
+  <section class="scr" data-s="0">
+    <h2>سلام! بیایید هوش مصنوعی را بدونِ فیلترشکن راه بیندازیم 👋</h2>
+    <p class="lead">این ابزار روی حسابِ رایگانِ «کلادفلر» (یک شرکتِ بزرگِ اینترنتی) یک «رله» برایتان می‌سازد. رله مثلِ یک پلِ شخصی است: برنامه‌ی شما از رویش رد می‌شود و به Gemini یا ChatGPT می‌رسد.</p>
+    <div class="card">
+      <p>✅ <b>رایگان</b> است و کارتِ بانکی نمی‌خواهد.</p>
+      <p>✅ حدودِ <b>۵ دقیقه</b> طول می‌کشد و فقط یک بار انجامش می‌دهید.</p>
+      <p>✅ <b>فقط مالِ شماست</b>؛ هیچ‌کس دیگر نمی‌تواند از آن استفاده کند.</p>
+      <p>✅ امن است: اطلاعاتتان فقط بینِ همین کامپیوتر و کلادفلر جابه‌جا می‌شود.</p>
+    </div>
+    <div class="tip warn">برای همین چند دقیقه‌ی ساختن، اگر سایتِ کلادفلر باز نشد، فیلترشکن را روشن کنید. بعد از ساختن، دیگر هیچ‌وقت فیلترشکن لازم نیست.</div>
+    <div class="nav"><span></span><button class="btn pri big" data-next>شروع کنیم ←</button></div>
+    <details id="haveAddr"><summary>قبلاً رله ساخته‌ام و یک آدرس از آن دارم</summary>
+      <p>یکی از آدرس‌هایی را که قبلاً گرفته‌اید (مثلاً آدرسِ Gemini که در برنامه گذاشته‌اید) اینجا بچسبانید؛ آدرسِ همه‌ی سرویس‌ها را از رویش می‌سازیم.</p>
+      <div class="row"><input type="text" id="oldAddr" spellcheck="false" placeholder="https://…workers.dev/…/gemini/v1beta"><button class="btn pri" id="btnOldAddr">نشان بده</button></div>
+      <div class="status" id="stOld"></div>
+    </details>
+  </section>
+
+  <!-- ═══ ۱. حساب ═══ -->
+  <section class="scr" data-s="1" hidden>
+    <h2>حسابِ کلادفلر دارید؟</h2>
+    <p class="lead">برای ساختنِ رله، یک حسابِ (رایگانِ) کلادفلر لازم است.</p>
+    <div class="row">
+      <button class="btn pri big" id="haveAcc">بله، دارم</button>
+      <button class="btn big" id="noAcc">نه، ندارم</button>
+    </div>
+    <div id="signupHelp" hidden>
+      <div class="card">
+        <ol class="todo">
+          <li>روی دکمه‌ی زیر بزنید تا صفحه‌ی ثبت‌نام باز شود.
+            <div class="row"><a class="btn pri" href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">باز کردنِ صفحه‌ی ثبت‌نام ↗</a></div></li>
+          <li>ایمیل و یک رمزِ دلخواه بنویسید و <span class="en">Sign up</span> را بزنید.</li>
+          <li>به ایمیلتان سر بزنید؛ کلادفلر یک نامه فرستاده. روی لینکِ داخلش بزنید تا حساب فعال شود. <span class="faint">(اگر نبود، پوشه‌ی Spam را ببینید.)</span></li>
+          <li>اگر بعد از ورود چیزی پرسید (مثلاً «چه می‌خواهید بسازید؟»)، می‌توانید <span class="en">Skip</span> بزنید یا صفحه را ببندید؛ لازم نیست.</li>
+        </ol>
+      </div>
+      <div class="nav"><button class="btn link" data-back>→ برگشت</button><button class="btn pri" data-next>ساختم، برویم بعدی ←</button></div>
+    </div>
+  </section>
+
+  <!-- ═══ ۲. ورود ═══ -->
+  <section class="scr" data-s="2" hidden>
+    <h2>اول در همین مرورگر وارد حسابتان شوید</h2>
+    <p class="lead">این مهم است: اگر وارد نشده باشید، صفحه‌ی بعدی گزینه‌ها را خودکار پر نمی‌کند.</p>
+    <ol class="todo">
+      <li>روی دکمه بزنید. داشبوردِ کلادفلر در زبانه‌ی تازه باز می‌شود.
+        <div class="row"><a class="btn pri" href="https://dash.cloudflare.com/login" target="_blank" rel="noopener">باز کردنِ کلادفلر ↗</a></div></li>
+      <li>اگر صفحه‌ی ورود آمد، ایمیل و رمزتان را بزنید و وارد شوید. اگر مستقیم داشبورد آمد، یعنی از قبل وارد هستید 👍</li>
+      <li>به همین زبانه برگردید.</li>
+    </ol>
+    <div class="nav"><button class="btn link" data-back>→ برگشت</button><button class="btn pri big" data-next>وارد شدم ←</button></div>
+  </section>
+
+  <!-- ═══ ۳. ساختِ کلید (توکن) ═══ -->
+  <section class="scr" data-s="3" hidden>
+    <h2>یک «کلیدِ دسترسی» بسازید</h2>
+    <p class="lead">این کلید به ابزار اجازه می‌دهد رله را روی حسابتان بسازد؛ فقط همین، نه چیزِ دیگر. همه‌ی گزینه‌ها <b>خودکار پر شده‌اند</b>؛ شما فقط دو دکمه می‌زنید.</p>
+    <div class="row center"><a class="btn pri big" id="tokenLink" target="_blank" rel="noopener" href="#">باز کردنِ صفحه‌ی ساختِ کلید ↗</a></div>
+
+    <p>در صفحه‌ای که باز می‌شود:</p>
+    <ol class="todo">
+      <li>کمی پایین بروید. باید چیزی شبیهِ این ببینید (گزینه‌ها پر شده‌اند؛ <b>دست نزنید</b>):
+        <div class="mock"><div class="bar"><i></i><i></i><i></i><span>dash.cloudflare.com › API Tokens › Create Custom Token</span></div>
+          <div class="body">
+            <div class="lbl">Token name</div><span class="fld">AI Relay</span>
+            <div class="lbl">Permissions</div>
+            <div><span class="fld">Account</span><span class="fld">Workers Scripts</span><span class="fld">Edit</span></div>
+            <div style="margin-top:4px"><span class="fld">Account</span><span class="fld">Account Settings</span><span class="fld">Read</span></div>
+            <div class="lbl">Account Resources</div><span class="fld">Include</span><span class="fld">All accounts</span>
+            <div><span class="cfbtn hl">Continue to summary</span><span class="tag">اینجا</span></div>
+          </div></div>
+        در پایینِ صفحه روی دکمه‌ی آبیِ <span class="en">Continue to summary</span> بزنید.</li>
+      <li>صفحه‌ی خلاصه می‌آید. روی <span class="en">Create Token</span> بزنید.
+        <div class="mock"><div class="bar"><i></i><i></i><i></i><span>AI Relay API token summary</span></div>
+          <div class="body"><h4>AI Relay API token summary</h4>
+            <div>All accounts — Workers Scripts:Edit, Account Settings:Read</div>
+            <span class="cfbtn gray">Back</span> <span class="cfbtn hl">Create Token</span><span class="tag">اینجا</span>
+          </div></div></li>
+      <li>کلید ساخته شد! روی <span class="en">Copy</span> بزنید تا کپی شود، و به همین زبانه برگردید.
+        <div class="mock"><div class="bar"><i></i><i></i><i></i><span>AI Relay API token was successfully created</span></div>
+          <div class="body"><div class="tokenbox">kX9w••••••••••••••••••••••••••Qz <span class="cfbtn hl" style="margin:0 0 0 8px;padding:2px 10px">Copy</span><span class="tag">اینجا</span></div>
+          <div style="color:#888;margin-top:6px">Copy this token… it will not be shown again.</div></div></div></li>
+    </ol>
+    <details>
+      <summary>صفحه خالی بود یا گزینه‌ها پر نشده بودند؟</summary>
+      <p>۱) مطمئن شوید در همین مرورگر وارد حسابِ کلادفلر شده‌اید و دوباره دکمه‌ی بالا را بزنید.</p>
+      <p>۲) این دکمه‌ی دوم را امتحان کنید (اگر چند حساب دارید، یکی را انتخاب کنید):</p>
+      <div class="row"><a class="btn" id="tokenLink2" target="_blank" rel="noopener" href="#">صفحه‌ی ساختِ کلید (راهِ دوم) ↗</a></div>
+      <p>۳) یا دستی بسازید:</p>
+      <ol class="todo">
+        <li>بالا سمتِ راستِ داشبورد روی آیکونِ آدمک ← <span class="en">Profile</span> ← از منوی کنار <span class="en">API Tokens</span>.</li>
+        <li><span class="en">Create Token</span> ← پایینِ صفحه، کنارِ <span class="en">Create Custom Token</span> روی <span class="en">Get started</span>.</li>
+        <li>در <span class="en">Token name</span> بنویسید <span class="en">AI Relay</span>.</li>
+        <li>در <span class="en">Permissions</span> سه کادرِ اول را به‌ترتیب بگذارید: <span class="en">Account</span> ، <span class="en">Workers Scripts</span> ، <span class="en">Edit</span>.</li>
+        <li><span class="en">+ Add more</span> بزنید و سطرِ دوم: <span class="en">Account</span> ، <span class="en">Account Settings</span> ، <span class="en">Read</span>.</li>
+        <li>بقیه را دست نزنید، و مثلِ بالا: <span class="en">Continue to summary</span> ← <span class="en">Create Token</span> ← <span class="en">Copy</span>.</li>
+      </ol>
+    </details>
+    <div class="nav"><button class="btn link" data-back>→ برگشت</button><button class="btn pri big" data-next>کلید را کپی کردم ←</button></div>
+  </section>
+
+  <!-- ═══ ۴. چسباندنِ کلید ═══ -->
+  <section class="scr" data-s="4" hidden>
+    <h2>کلید را اینجا بچسبانید</h2>
+    <p class="lead">روی دکمه‌ی «چسباندن» بزنید، یا در کادر کلیک کنید و <span class="en">Ctrl+V</span> بزنید.</p>
+    <div class="row"><input type="password" id="tok" autocomplete="off" spellcheck="false" placeholder="token…"><button class="btn" id="btnPaste">📋 چسباندن</button></div>
+    <div id="accBox" hidden><label for="acc">کدام حساب؟</label><select id="acc"></select></div>
+    <div id="accManual" hidden>
+      <div class="tip warn">یک کارِ کوچکِ دیگر: «شناسه‌ی حساب» را هم لازم داریم.</div>
+      <ol class="todo">
+        <li>به زبانه‌ی کلادفلر بروید و به صفحه‌ی اصلیِ داشبورد برگردید.</li>
+        <li>به نوارِ آدرسِ مرورگر نگاه کنید: <span class="en">dash.cloudflare.com/<b>a1b2c3…</b>/home</span>. آن رشته‌ی طولانیِ وسط (۳۲ حرف و عدد) شناسه است. کپی‌اش کنید و اینجا بچسبانید.</li>
+      </ol>
+      <input type="text" id="accId" spellcheck="false" placeholder="Account ID (32 characters)">
+    </div>
+    <div class="status" id="stVerify"></div>
+    <div class="nav"><button class="btn link" data-back>→ برگشت</button><button class="btn pri big" id="btnVerify">بررسیِ کلید ←</button></div>
+  </section>
+
+  <!-- ═══ ۵. ساختن ═══ -->
+  <section class="scr" data-s="5" hidden>
+    <h2>همه‌چیز آماده است. بسازیم؟</h2>
+    <p class="lead">با زدنِ دکمه، رله روی حسابِ کلادفلرِ شما ساخته و آزمایش می‌شود. حدودِ یک دقیقه طول می‌کشد؛ صبر کنید.</p>
+    <div class="row center"><button class="btn pri big" id="btnDeploy">🚀 بساز</button></div>
+    <div class="status center" id="stDeploy"></div>
+    <details><summary>تنظیمِ پیشرفته (لازم نیست)</summary>
+      <label for="wname">اسمِ رله در کلادفلر</label><input type="text" id="wname" value="ai-relay" spellcheck="false">
+      <p class="faint">فقط حروفِ کوچکِ انگلیسی، عدد و خط‌تیره.</p>
+    </details>
+    <div class="nav"><button class="btn link" data-back>→ برگشت</button><span></span></div>
+  </section>
+
+  <!-- ═══ ۶. در ساتراپیون ═══ -->
+  <section class="scr" data-s="6" hidden>
+    <h2>🎉 رله ساخته شد! حالا در برنامه بگذاریدش</h2>
+    <div class="status" id="stPing"></div>
+    <p class="lead">این آدرسِ شخصیِ شماست (برای Gemini):</p>
+    <div class="addr" id="mainAddr"></div>
+    <div class="row"><button class="btn pri" id="copyMain">📋 کپیِ آدرس</button></div>
+
+    <div class="card">
+      <p><b>در ساتراپیون این کارها را بکنید:</b></p>
+      <ol class="todo">
+        <li><b>تنظیمات</b> ← <b>هوش مصنوعی</b> را باز کنید.</li>
+        <li>پایینِ بخش، «تنظیماتِ اتصال (پیشرفته)» را باز کنید و مطمئن شوید روی <b>مستقیم</b> است. (آدرس را <b>آنجا نگذارید</b>.)</li>
+        <li>در فهرستِ اتصال‌ها روی <b>اتصالِ جدید</b> بزنید و <b>سفارشی</b> را انتخاب کنید.</li>
+        <li>این‌ها را پر کنید:
+          <div class="kv">
+            <span>قالب:</span><span><b>Gemini</b></span>
+            <span>آدرسِ پایه:</span><span>همان آدرسی که کپی کردید</span>
+            <span>کلیدِ API:</span><span>کلیدِ Gemini خودتان (<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">گرفتنِ کلیدِ رایگان ↗</a>)</span>
+          </div></li>
+        <li>یک مدل از فهرست انتخاب کنید و ذخیره کنید. اگر فهرستِ مدل‌ها آمد، یعنی همه‌چیز درست است ✅</li>
+        <li>این اتصال را <b>اصلی</b> کنید و اتصالِ «Google Gemini» قبلی را <b>خاموش</b> کنید.</li>
+      </ol>
+    </div>
+
+    <details><summary>آدرس برای سرویس‌های دیگر (ChatGPT، Claude، Groq…)</summary>
+      <p class="faint">برای هر سرویس یک اتصالِ سفارشیِ جدا بسازید، با «قالب» و آدرسِ همان ردیف و کلیدِ خودِ آن سرویس.</p>
+      <table><tbody id="rows"></tbody></table>
+    </details>
+
+    <div class="tip good"><b>آدرس‌ها ذخیره شدند.</b> هر وقت آدرسِ سرویسِ دیگری خواستید، کافی است همین ابزار را دوباره باز کنید؛ لازم نیست مراحل را از اول بروید. یک راهِ دیگر هم دارید: صفحه‌ی <a id="listLink" target="_blank" rel="noopener" href="#">«همه‌ی آدرس‌های من» ↗</a> را باز کنید و در مرورگر <b>نشانک (Bookmark)</b> کنید؛ از هر کامپیوتر و گوشی‌ای باز می‌شود.</div>
+    <div class="tip bad">این آدرس‌ها مثلِ رمزند؛ برای کسی نفرستید.</div>
+    <div class="nav"><span></span><button class="btn pri big" data-next>انجام دادم ←</button></div>
+  </section>
+
+  <!-- ═══ ۷. پایان ═══ -->
+  <section class="scr" data-s="7" hidden>
+    <h2>یک کارِ آخر: پاک کردنِ کلیدِ دسترسی</h2>
+    <p class="lead">کلیدی که ساختید دیگر لازم نیست. پاک کردنش امن‌تر است (رله سرِ جایش می‌ماند و کار می‌کند).</p>
+    <ol class="todo">
+      <li><a class="btn" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">باز کردنِ فهرستِ کلیدها ↗</a></li>
+      <li>کنارِ <span class="en">AI Relay</span> روی سه‌نقطه <span class="en">···</span> بزنید ← <span class="en">Delete</span> ← دوباره <span class="en">Delete</span>.</li>
+    </ol>
+    <div class="tip good"><b>تمام شد!</b> می‌توانید این ابزار را ببندید. هوش مصنوعیِ برنامه حالا بدونِ فیلترشکن کار می‌کند.</div>
+    <div class="row"><button class="btn pri big" id="btnDone">بستنِ ابزار</button></div>
+    <details><summary>کارهای دیگر (کلیدِ تازه / حذفِ رله) — پیش از پاک کردنِ کلید</summary>
+      <p>اگر آدرس لو رفت، «آدرسِ تازه» بسازید (آدرسِ قبلی از کار می‌افتد و آدرسِ جدید را در برنامه بگذارید).</p>
+      <div class="row"><button class="btn" id="btnRotate">آدرسِ تازه</button><button class="btn danger" id="btnDelete">حذفِ رله</button></div>
+      <div class="status" id="stManage"></div>
+    </details>
+  </section>
+</div>
+
+<script>
+(() => {
+  // کلیدِ همین اجرا: از آدرس خوانده و از نوارِ آدرس پاک می‌شود؛ برای «تازه‌سازیِ صفحه» در همین زبانه نگه داشته می‌شود.
+  let KEY = (location.hash.match(/k=([0-9a-f]+)/) || [])[1] || '';
+  try { if (KEY) sessionStorage.setItem('relayKey', KEY); else KEY = sessionStorage.getItem('relayKey') || ''; } catch {}
+  history.replaceState(null, '', location.pathname);
+  const $ = (s) => document.querySelector(s);
+  const LAST = 7;
+  let cur = 0;
+  const show = (n) => {
+    $('#saved').hidden = true; $('#prog').hidden = false;
+    cur = Math.max(0, Math.min(LAST, n));
+    document.querySelectorAll('.scr').forEach((s) => (s.hidden = +s.dataset.s !== cur));
+    $('#prog').innerHTML = Array.from({ length: LAST }, (_, i) => `<i class="${i < cur ? 'on' : ''}"></i>`).join('');
+    $('#stepno').textContent = cur ? `قدمِ ${cur.toLocaleString('fa')} از ${LAST.toLocaleString('fa')}` : '';
+    scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-next]')) show(cur + 1);
+    if (e.target.closest('[data-back]')) show(cur - 1);
+    const c = e.target.closest('[data-copy]'); if (c) copy(c.dataset.copy, c);
+  });
+  $('#haveAcc').onclick = () => show(2);
+  $('#noAcc').onclick = () => { $('#signupHelp').hidden = false; };
+
+  const SERVICES = [
+    ['ChatGPT (OpenAI)', 'OpenAI', 'openai/v1'], ['Claude (Anthropic)', 'Anthropic', 'anthropic/v1'],
+    ['OpenRouter', 'OpenAI', 'openrouter/api/v1'], ['Groq', 'OpenAI', 'groq/openai/v1'], ['Grok (xAI)', 'OpenAI', 'xai/v1'],
+    ['Mistral', 'OpenAI', 'mistral/v1'], ['DeepSeek', 'OpenAI', 'deepseek/v1'],
+  ];
+  const ERR = {
+    invalid_address: 'آدرس درست نیست.',
+    token_invalid: 'این کلید درست نیست. دوباره از صفحه‌ی کلادفلر کپی کنید (کلِ آن را). اگر صفحه را بسته‌اید، یک کلیدِ تازه بسازید (قدمِ قبل).',
+    invalid_token_format: 'چیزی که چسباندید شبیهِ کلید نیست. فقط همان رشته‌ی طولانی را کپی کنید، نه متن‌های دیگرِ صفحه.',
+    no_permission: 'کلید اجازه‌ی کافی ندارد. یک کلیدِ تازه با دکمه‌ی قدمِ قبل بسازید و به گزینه‌ها دست نزنید.',
+    invalid_account_id: 'شناسه‌ی حساب باید ۳۲ حرف و عددِ انگلیسی باشد. دوباره از نوارِ آدرس کپی کنید.',
+    invalid_worker_name: 'اسمِ رله فقط حروفِ کوچکِ انگلیسی، عدد و خط‌تیره می‌تواند باشد.',
+    subdomain_failed: 'کلادفلر هنوز آماده نیست. در داشبوردِ کلادفلر از منوی کنار یک بار روی «Workers & Pages» بزنید، بعد برگردید و دوباره «بساز» را بزنید.',
+    upload_failed: 'ساختن نشد. یک دقیقه بعد دوباره امتحان کنید.',
+    enable_failed: 'رله ساخته شد ولی روشن نشد. یک دقیقه بعد دوباره «بساز» را بزنید.',
+    delete_failed: 'حذف نشد.',
+    cloudflare_unreachable: 'به کلادفلر وصل نشد. اینترنت را بررسی کنید؛ اگر وصل است، برای همین چند دقیقه فیلترشکن را روشن کنید.',
+    session: 'این صفحه قدیمی است. ابزار را ببندید و دوباره اجرا کنید.',
+    closed: 'ابزار بسته شده است. دوباره اجرایش کنید.',
+  };
+  const status = (el, c, m, spin) => { el.className = 'status ' + c + (el.classList.contains('center') ? ' center' : ''); el.innerHTML = (spin ? '<span class="spin"></span>' : '') + m; };
+  const errMsg = (j) => ERR[j?.error] || ('خطا: ' + (j?.cf_message || j?.error || 'نامعلوم'));
+  const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  async function api(action, body = {}) {
+    try {
+      const r = await fetch('/api/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Relay-Key': KEY }, body: JSON.stringify(body) });
+      if (r.status === 403) return { error: 'session' };
+      return await r.json();
+    } catch { return { error: 'closed' }; }
+  }
+  async function copy(t, b) {
+    try { await navigator.clipboard.writeText(t); } catch { const x = document.createElement('textarea'); x.value = t; document.body.append(x); x.select(); document.execCommand('copy'); x.remove(); }
+    if (b) { const o = b.textContent; b.textContent = '✓ کپی شد'; setTimeout(() => (b.textContent = o), 1500); }
+  }
+
+  // لینک‌های ساختِ کلید با گزینه‌های پرشده (قالبِ رسمیِ کلادفلر)
+  const perms = encodeURIComponent(JSON.stringify([{ key: 'workers_scripts', type: 'edit' }, { key: 'account_settings', type: 'read' }]));
+  $('#tokenLink').href = `https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=${perms}&accountId=*&zoneId=all&name=AI%20Relay`;
+  $('#tokenLink2').href = `https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=${perms}&name=AI%20Relay`;
+
+  // کلید
+  const token = () => $('#tok').value.trim().replace(/\s+/g, '');
+  const account = () => (!$('#accBox').hidden ? $('#acc').value : $('#accId').value.trim().toLowerCase());
+  const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  let verified = false;
+  $('#btnPaste').onclick = async () => {
+    try { $('#tok').value = (await navigator.clipboard.readText()).trim(); verify(); }
+    catch { $('#tok').focus(); status($('#stVerify'), 'err', 'مرورگر اجازه‌ی چسباندنِ خودکار نداد؛ در کادر کلیک کنید و Ctrl+V بزنید.'); }
+  };
+  $('#tok').addEventListener('paste', () => setTimeout(verify, 50));
+  $('#btnVerify').onclick = () => (verified ? show(5) : verify());
+
+  async function verify() {
+    const st = $('#stVerify');
+    if (!token()) return status(st, 'err', 'اول کلید را بچسبانید.');
+    status(st, 'busy', 'در حالِ بررسیِ کلید…', true);
+    $('#btnVerify').disabled = true;
+    const j = await api('verify', { token: token(), account_id: $('#accId').value.trim() });
+    $('#btnVerify').disabled = false;
+    if (!j.ok) {
+      verified = false;
+      if (j.error === 'token_invalid' && $('#accManual').hidden) {
+        // شاید «کلیدِ حساب» است (راهِ دوم) که شناسه‌ی حساب می‌خواهد
+        $('#accManual').hidden = false;
+        return status(st, 'err', errMsg(j) + ' اگر کلید را با «راهِ دوم» ساخته‌اید، شناسه‌ی حساب را هم پایین وارد کنید.');
+      }
+      return status(st, 'err', errMsg(j));
+    }
+    if (j.accounts.length > 1) {
+      $('#acc').innerHTML = j.accounts.map((a) => `<option value="${esc(a.id)}">${esc(a.name || a.id)}</option>`).join('');
+      $('#accBox').hidden = false; $('#accManual').hidden = true;
+    } else if (j.accounts.length === 1) {
+      $('#acc').innerHTML = `<option value="${esc(j.accounts[0].id)}"></option>`; // تنها حساب: بی‌سؤال
+      $('#accBox').hidden = true; $('#accManual').hidden = true;
+      $('#accBox').dataset.single = '1';
+    } else {
+      $('#accManual').hidden = false;
+      if (!/^[0-9a-f]{32}$/i.test($('#accId').value.trim())) return status(st, 'err', 'کلید درست است ✓ — فقط شناسه‌ی حساب را هم وارد کنید و دوباره «بررسی» را بزنید.');
+    }
+    verified = true;
+    status(st, 'ok', '✓ کلید درست است!');
+    $('#btnVerify').textContent = 'برویم بعدی ←';
+  }
+  const accountId = () => ($('#accBox').dataset.single === '1' || !$('#accBox').hidden ? $('#acc').value : $('#accId').value.trim().toLowerCase());
+
+  // ساختن
+  let deployed = null;
+  async function ping(url, secret, tries) {
+    for (let i = 0; i < tries; i++) {
+      try { const r = await fetch(`${url}/${secret}/ping`, { cache: 'no-store', signal: AbortSignal.timeout(6000) }); if (r.ok) { const j = await r.json(); if (j.ok) return j; } } catch {}
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    return null;
+  }
+  async function deploy(st) {
+    const secret = newSecret(), name = $('#wname').value.trim().toLowerCase() || 'ai-relay', acc = accountId();
+    status(st, 'busy', 'در حالِ ساختن… (تا یک دقیقه)', true);
+    const j = await api('deploy', { token: token(), account_id: acc, name, secret });
+    if (!j.ok) { status(st, 'err', errMsg(j)); return false; }
+    deployed = { acc, name };
+    const main = `${j.url}/${secret}/gemini/v1beta`;
+    $('#listLink').href = `${j.url}/${secret}/`;
+    $('#mainAddr').textContent = main;
+    $('#copyMain').onclick = (e) => copy(main, e.currentTarget);
+    $('#rows').innerHTML = SERVICES.map(([n, f, p]) => { const u = `${j.url}/${secret}/${p}`; return `<tr><td>${n}<br><span class="faint">قالب: ${f}</span></td><td class="a">${u}</td><td><button class="btn sm" data-copy="${u}">کپی</button></td></tr>`; }).join('');
+    status(st, 'busy', 'ساخته شد! در حالِ آزمایش… (آدرسِ تازه تا یک دقیقه طول می‌کشد)', true);
+    const p = await ping(j.url, secret, 14);
+    show(6);
+    if (p) status($('#stPing'), 'ok', '✓ رله آزمایش شد و از همین اینترنت کار می‌کند.');
+    else status($('#stPing'), 'err', 'رله ساخته شد، ولی هنوز از این اینترنت جواب نمی‌دهد. چند دقیقه صبر کنید و در برنامه امتحان کنید. اگر فیلترشکن روشن است، خاموشش کنید.');
+    return true;
+  }
+  $('#btnDeploy').onclick = async () => { $('#btnDeploy').disabled = true; await deploy($('#stDeploy')); $('#btnDeploy').disabled = false; };
+  $('#btnRotate').onclick = async () => { if (confirm('آدرسِ فعلی از کار می‌افتد و باید آدرسِ جدید را در برنامه بگذارید. ادامه؟')) await deploy($('#stManage')); };
+  $('#btnDelete').onclick = async () => {
+    if (!deployed || !confirm('رله از حسابِ کلادفلرِ شما حذف می‌شود و هوش مصنوعیِ برنامه از این راه دیگر کار نمی‌کند. حذف شود؟')) return;
+    const j = await api('delete', { token: token(), account_id: deployed.acc, name: deployed.name });
+    status($('#stManage'), j.ok ? 'ok' : 'err', j.ok ? 'رله حذف شد.' : errMsg(j));
+  };
+  const quit = async () => { await api('quit'); document.body.innerHTML = '<div class="closed">ابزار بسته شد. می‌توانید این زبانه را ببندید. 👋</div>'; };
+  $('#btnQuit').onclick = () => { if (cur < 6 || confirm('ابزار بسته شود؟')) quit(); };
+  $('#btnDone').onclick = quit;
+
+  // ─── رله‌های ذخیره‌شده: بازگشتِ کاربر بدونِ تکرارِ مراحل ───
+  const ALL = [['Gemini', 'Gemini', 'gemini/v1beta'], ...SERVICES];
+  const listRows = (url, secret) => '<table><tbody>' + ALL.map(([n, f, p]) => {
+    const u = `${url}/${secret}/${p}`;
+    return `<tr><td><b>${n}</b><br><span class="faint">قالب: ${f}</span></td><td class="a">${esc(u)}</td><td><button class="btn sm pri" data-copy="${esc(u)}">کپی</button></td></tr>`;
+  }).join('') + '</tbody></table>';
+
+  function showSaved(relays, file) {
+    document.querySelectorAll('.scr').forEach((s) => (s.hidden = true));
+    $('#prog').hidden = true; $('#stepno').textContent = '';
+    $('#savedList').innerHTML = relays.map((r, i) => {
+      const host = r.url.replace('https://', '');
+      const date = r.created ? new Date(r.created * 1000).toLocaleDateString('fa-IR') : '';
+      return `<div class="card">
+        ${relays.length > 1 ? `<p><b>رله‌ی ${(i + 1).toLocaleString('fa')}</b> <span class="faint">${esc(host)}${date ? ' — ' + date : ''}</span></p>` : `<p class="faint">${esc(host)}${date ? ' — ساخته‌شده در ' + date : ''}</p>`}
+        ${listRows(r.url, r.secret)}
+        <div class="row">
+          <a class="btn sm" target="_blank" rel="noopener" href="${esc(r.url + '/' + r.secret + '/')}">صفحه‌ی همه‌ی آدرس‌ها (برای نشانک) ↗</a>
+          <button class="btn sm link" data-forget="${esc(r.url)}">پاک کردن از این کامپیوتر</button>
+        </div></div>`;
+    }).join('');
+    $('#savedFile').textContent = file ? `ذخیره‌شده در: ${file}` : '';
+    $('#saved').hidden = false;
+  }
+  async function refreshSaved() {
+    const j = await api('saved');
+    if (j.ok && j.relays && j.relays.length) { showSaved(j.relays, j.file); return true; }
+    return false;
+  }
+  document.addEventListener('click', async (e) => {
+    const f = e.target.closest('[data-forget]'); if (!f) return;
+    if (!confirm('آدرس‌ها فقط از این کامپیوتر پاک می‌شوند؛ خودِ رله سرِ جایش می‌ماند و کار می‌کند. ادامه؟')) return;
+    await api('forget', { url: f.dataset.forget });
+    if (!(await refreshSaved())) show(0);
+  });
+  $('#btnNewRelay').onclick = () => show(0);
+
+  // «یک آدرس از قبل دارم»: آدرسِ هر سرویسی ⇒ آدرسِ رله + کلیدِ مخفی ⇒ همه‌ی سرویس‌ها
+  $('#btnOldAddr').onclick = async () => {
+    const m = $('#oldAddr').value.trim().match(/^(https:\/\/[^\/\s]+)\/([A-Za-z0-9_-]{16,80})(?:\/|$)/);
+    if (!m) return status($('#stOld'), 'err', 'این آدرس شبیهِ آدرسِ رله نیست. کاملش را کپی کنید؛ باید با https:// شروع شود.');
+    status($('#stOld'), 'busy', 'در حالِ بررسی…', true);
+    let alive = false;
+    try { const r = await fetch(`${m[1]}/${m[2]}/ping`, { cache: 'no-store', signal: AbortSignal.timeout(6000) }); alive = r.ok; } catch {}
+    const j = await api('save', { url: m[1], secret: m[2] });
+    if (!j.ok) return status($('#stOld'), 'err', 'ذخیره نشد: ' + errMsg(j));
+    await refreshSaved();
+    if (!alive) $('#savedList').insertAdjacentHTML('afterbegin', '<div class="tip warn">رله الان جواب نداد (شاید فیلترشکن روشن است، یا رله حذف شده). آدرس‌ها نشان داده شدند، ولی اگر در برنامه کار نکردند، یک رله‌ی تازه بسازید.</div>');
+  };
+
+  refreshSaved().then((has) => { if (!has) show(0); });
+})();
+</script>
+</body>
+</html>
